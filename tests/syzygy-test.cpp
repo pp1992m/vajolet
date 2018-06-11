@@ -12,11 +12,11 @@ TEST(Syzygy, test)
 	Position pos;
 	
 	std::string line;
-	std::ifstream myfile ("testsyzygy.csv");
+	std::ifstream myfile ("D:/vajolet/testsyzygy.csv/testsyzygy.csv");
 	
 	ASSERT_TRUE(myfile.is_open());
 	
-	tb_init("C:/vajolet/syzygy");
+	tb_init("D:/vajolet/syzygy");
 	ASSERT_TRUE(TB_LARGEST > 0);
 	
 	

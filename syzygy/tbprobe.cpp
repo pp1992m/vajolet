@@ -28,6 +28,7 @@
 #include <stdlib.h>
 
 #include "tbprobe.h"
+#include "../movegen.h"
 
 #define WHITE_KING              (TB_WPAWN + 5)
 #define WHITE_QUEEN             (TB_WPAWN + 4)
@@ -131,411 +132,6 @@ static inline unsigned lsb(uint64_t b)
 }
 #endif
 #define square(r, f)            (8 * (r) + (f))
-
-#ifdef TB_KING_ATTACKS
-#define king_attacks(s)         TB_KING_ATTACKS(s)
-#define king_attacks_init()     /* NOP */
-#else       /* TB_KING_ATTACKS */
-
-static uint64_t king_attacks_table[64];
-
-#define king_attacks(s)         king_attacks_table[(s)]
-
-static void king_attacks_init(void)
-{
-    for (unsigned s = 0; s < 64; s++)
-    {
-        unsigned r = rank(s);
-        unsigned f = file(s);
-        uint64_t b = 0;
-        if (r != 0 && f != 0)
-            b |= board(square(r-1, f-1));
-        if (r != 0)
-            b |= board(square(r-1, f));
-        if (r != 0 && f != 7)
-            b |= board(square(r-1, f+1));
-        if (f != 7)
-            b |= board(square(r, f+1));
-        if (r != 7 && f != 7)
-            b |= board(square(r+1, f+1));
-        if (r != 7)
-            b |= board(square(r+1, f));
-        if (r != 7 && f != 0)
-            b |= board(square(r+1, f-1));
-        if (f != 0)
-            b |= board(square(r, f-1));
-        king_attacks_table[s] = b;
-    }
-}
-
-#endif      /* TB_KING_ATTACKS */
-
-#ifdef TB_KNIGHT_ATTACKS
-#define knight_attacks(s)       TB_KNIGHT_ATTACKS(s)
-#define knight_attacks_init()   /* NOP */
-#else       /* TB_KNIGHT_ATTACKS */
-
-static uint64_t knight_attacks_table[64];
-
-#define knight_attacks(s)       knight_attacks_table[(s)]
-
-static void knight_attacks_init(void)
-{
-    for (unsigned s = 0; s < 64; s++)
-    {
-        int r1, r = rank(s);
-        int f1, f = file(s);
-        uint64_t b = 0;
-        r1 = r-1; f1 = f-2;
-        if (r1 >= 0 && f1 >= 0)
-            b |= board(square(r1, f1));
-        r1 = r-1; f1 = f+2;
-        if (r1 >= 0 && f1 <= 7)
-            b |= board(square(r1, f1));
-        r1 = r-2; f1 = f-1;
-        if (r1 >= 0 && f1 >= 0)
-            b |= board(square(r1, f1));
-        r1 = r-2; f1 = f+1;
-        if (r1 >= 0 && f1 <= 7)
-            b |= board(square(r1, f1));
-        r1 = r+1; f1 = f-2;
-        if (r1 <= 7 && f1 >= 0)
-            b |= board(square(r1, f1));
-        r1 = r+1; f1 = f+2;
-        if (r1 <= 7 && f1 <= 7)
-            b |= board(square(r1, f1));
-        r1 = r+2; f1 = f-1;
-        if (r1 <= 7 && f1 >= 0)
-            b |= board(square(r1, f1));
-        r1 = r+2; f1 = f+1;
-        if (r1 <= 7 && f1 <= 7)
-            b |= board(square(r1, f1));
-        knight_attacks_table[s] = b;
-    }
-}
-
-#endif      /* TB_KNIGHT_ATTACKS */
-
-#ifdef TB_BISHOP_ATTACKS
-#define bishop_attacks(s, occ)  TB_BISHOP_ATTACKS(s, occ)
-#define bishop_attacks_init()   /* NOP */
-#else       /* TB_BISHOP_ATTACKS */
-
-static uint64_t diag_attacks_table[64][64];
-static uint64_t anti_attacks_table[64][64];
-
-static const unsigned square2diag_table[64] =
-{
-    0,  1,  2,  3,  4,  5,  6,  7,
-    14, 0,  1,  2,  3,  4,  5,  6,
-    13, 14, 0,  1,  2,  3,  4,  5,
-    12, 13, 14, 0,  1,  2,  3,  4,
-    11, 12, 13, 14, 0,  1,  2,  3,
-    10, 11, 12, 13, 14, 0,  1,  2,
-    9,  10, 11, 12, 13, 14, 0,  1,
-    8,  9,  10, 11, 12, 13, 14, 0
-};
-
-static const unsigned square2anti_table[64] =
-{
-    8,  9,  10, 11, 12, 13, 14, 0,
-    9,  10, 11, 12, 13, 14, 0,  1,
-    10, 11, 12, 13, 14, 0,  1,  2,
-    11, 12, 13, 14, 0,  1,  2,  3,
-    12, 13, 14, 0,  1,  2,  3,  4,
-    13, 14, 0,  1,  2,  3,  4,  5,
-    14, 0,  1,  2,  3,  4,  5,  6,
-    0,  1,  2,  3,  4,  5,  6,  7
-};
-
-static const uint64_t diag2board_table[15] =
-{
-    0x8040201008040201ull,
-    0x0080402010080402ull,
-    0x0000804020100804ull,
-    0x0000008040201008ull,
-    0x0000000080402010ull,
-    0x0000000000804020ull,
-    0x0000000000008040ull,
-    0x0000000000000080ull,
-    0x0100000000000000ull,
-    0x0201000000000000ull,
-    0x0402010000000000ull,
-    0x0804020100000000ull,
-    0x1008040201000000ull,
-    0x2010080402010000ull,
-    0x4020100804020100ull,
-};
-
-static const uint64_t anti2board_table[15] =
-{
-    0x0102040810204080ull,
-    0x0204081020408000ull,
-    0x0408102040800000ull,
-    0x0810204080000000ull,
-    0x1020408000000000ull,
-    0x2040800000000000ull,
-    0x4080000000000000ull,
-    0x8000000000000000ull,
-    0x0000000000000001ull,
-    0x0000000000000102ull,
-    0x0000000000010204ull,
-    0x0000000001020408ull,
-    0x0000000102040810ull,
-    0x0000010204081020ull,
-    0x0001020408102040ull,
-};
-
-static inline size_t diag2index(uint64_t b)
-{
-    b *= 0x0101010101010101ull;
-    b >>= 56;
-    b >>= 1;
-    return (size_t)b;
-}
-
-static inline size_t anti2index(uint64_t b)
-{
-    return diag2index(b);
-}
-
-#define diag(s)                 square2diag_table[(s)]
-#define anti(s)                 square2anti_table[(s)]
-#define diag2board(d)           diag2board_table[(d)]
-#define anti2board(a)           anti2board_table[(a)]
-
-static uint64_t bishop_attacks(unsigned sq, uint64_t occ)
-{
-    occ &= ~board(sq);
-    unsigned d = diag(sq), a = anti(sq);
-    uint64_t d_occ = occ & (diag2board(d) & ~BOARD_EDGE);
-    uint64_t a_occ = occ & (anti2board(a) & ~BOARD_EDGE);
-    size_t d_idx = diag2index(d_occ);
-    size_t a_idx = anti2index(a_occ);
-    uint64_t d_attacks = diag_attacks_table[sq][d_idx];
-    uint64_t a_attacks = anti_attacks_table[sq][a_idx];
-    return d_attacks | a_attacks;
-}
-
-static void bishop_attacks_init(void)
-{
-    for (unsigned idx = 0; idx < 64; idx++)
-    {
-        unsigned idx1 = idx << 1;
-        for (unsigned s = 0; s < 64; s++)
-        {
-            int r = rank(s);
-            int f = file(s);
-            uint64_t b = 0;
-            for (int i = -1; f + i >= 0 && r + i >= 0; i--)
-            {
-                unsigned occ = (1 << (f + i));
-                b |= board(square(r + i, f + i));
-                if (idx1 & occ)
-                    break;
-            }
-            for (int i = 1; f + i <= 7 && r + i <= 7; i++)
-            {
-                unsigned occ = (1 << (f + i));
-                b |= board(square(r + i, f + i));
-                if (idx1 & occ)
-                    break;
-            }
-            diag_attacks_table[s][idx] = b;
-        }
-    }
-
-    for (unsigned idx = 0; idx < 64; idx++)
-    {
-        unsigned idx1 = idx << 1;
-        for (unsigned s = 0; s < 64; s++)
-        {
-            int r = rank(s);
-            int f = file(s);
-            uint64_t b = 0;
-            for (int i = -1; f + i >= 0 && r - i <= 7; i--)
-            {
-                unsigned occ = (1 << (f + i));
-                b |= board(square(r - i, f + i));
-                if (idx1 & occ)
-                    break;
-            }
-            for (int i = 1; f + i <= 7 && r - i >= 0; i++)
-            {
-                unsigned occ = (1 << (f + i));
-                b |= board(square(r - i, f + i));
-                if (idx1 & occ)
-                    break;
-            }
-            anti_attacks_table[s][idx] = b;
-        }
-    }
-}
-
-#endif      /* TB_BISHOP_ATTACKS */
-
-#ifdef TB_ROOK_ATTACKS
-#define rook_attacks(s, occ)    TB_ROOK_ATTACKS(s, occ)
-#define rook_attacks_init()     /* NOP */
-#else       /* TB_ROOK_ATTACKS */
-
-static uint64_t rank_attacks_table[64][64];
-static uint64_t file_attacks_table[64][64];
-
-static inline size_t rank2index(uint64_t b, unsigned r)
-{
-    b >>= (8 * r);
-    b >>= 1;
-    return (size_t)b;
-}
-
-static inline size_t file2index(uint64_t b, unsigned f)
-{
-    b >>= f;
-    b *= 0x0102040810204080ull;
-    b >>= 56;
-    b >>= 1;
-    return (size_t)b;
-}
-
-#define rank2board(r)           (0xFFull << (8 * (r)))
-#define file2board(f)           (0x0101010101010101ull << (f))
-
-static uint64_t rook_attacks(unsigned sq, uint64_t occ)
-{
-    occ &= ~board(sq);
-    unsigned r = rank(sq), f = file(sq);
-    uint64_t r_occ = occ & (rank2board(r) & ~BOARD_RANK_EDGE);
-    uint64_t f_occ = occ & (file2board(f) & ~BOARD_FILE_EDGE);
-    size_t r_idx = rank2index(r_occ, r);
-    size_t f_idx = file2index(f_occ, f);
-    uint64_t r_attacks = rank_attacks_table[sq][r_idx];
-    uint64_t f_attacks = file_attacks_table[sq][f_idx];
-    return r_attacks | f_attacks;
-}
-
-static void rook_attacks_init(void)
-{
-    for (unsigned idx = 0; idx < 64; idx++)
-    {
-        unsigned idx1 = idx << 1, occ;
-        for (int f = 0; f <= 7; f++)
-        {
-            uint64_t b = 0;
-            if (f > 0)
-            {
-                int i = f-1;
-                do
-                {
-                    occ = (1 << i);
-                    b |= board(square(0, i));
-                    i--;
-                }
-                while (!(idx1 & occ) && i >= 0);
-            }
-            if (f < 7)
-            {
-                int i = f+1;
-                do
-                {
-                    occ = (1 << i);
-                    b |= board(square(0, i));
-                    i++;
-                }
-                while (!(idx1 & occ) && i <= 7);
-            }
-            for (int r = 0; r <= 7; r++)
-            {
-                rank_attacks_table[square(r, f)][idx] = b;
-                b <<= 8;
-            }
-        }
-    }
-    for (unsigned idx = 0; idx < 64; idx++)
-    {
-        unsigned idx1 = idx << 1, occ;
-        for (int r = 0; r <= 7; r++)
-        {
-            uint64_t b = 0;
-            if (r > 0)
-            {
-                int i = r-1;
-                do
-                {
-                    occ = (1 << i);
-                    b |= board(square(i, 0));
-                    i--;
-                }
-                while (!(idx1 & occ) && i >= 0);
-            }
-            if (r < 7)
-            {
-                int i = r+1;
-                do
-                {
-                    occ = (1 << i);
-                    b |= board(square(i, 0));
-                    i++;
-                }
-                while (!(idx1 & occ) && i <= 7);
-            }
-            for (int f = 0; f <= 7; f++)
-            {
-                file_attacks_table[square(r, f)][idx] = b;
-                b <<= 1;
-            }
-        }
-    }
-}
-
-#endif      /* TB_ROOK_ATTACKS */
-
-#ifdef TB_QUEEN_ATTACKS
-#define queen_attacks(s, occ)   TB_QUEEN_ATTACKS(s, occ)
-#else       /* TB_QUEEN_ATTACKS */
-#define queen_attacks(s, occ)   \
-    (rook_attacks((s), (occ)) | bishop_attacks((s), (occ)))
-#endif      /* TB_QUEEN_ATTACKS */
-
-#ifdef TB_PAWN_ATTACKS
-#define pawn_attacks(s, c)      TB_PAWN_ATTACKS(s, c)
-#define pawn_attacks_init()     /* NOP */
-#else       /* TB_PAWN_ATTACKS */
-
-static uint64_t pawn_attacks_table[2][64];
-
-#define pawn_attacks(s, c)      pawn_attacks_table[(c)][(s)]
-
-static void pawn_attacks_init(void)
-{
-    for (unsigned s = 0; s < 64; s++)
-    {
-        int r = rank(s);
-        int f = file(s);
-
-        uint64_t b = 0;
-        if (r != 7)
-        {
-            if (f != 0)
-                b |= board(square(r+1, f-1));
-            if (f != 7)
-                b |= board(square(r+1, f+1));
-        }
-        pawn_attacks_table[1][s] = b;
-
-        b = 0;
-        if (r != 0)
-        {
-            if (f != 0)
-                b |= board(square(r-1, f-1));
-            if (f != 7)
-                b |= board(square(r-1, f+1));
-        }
-        pawn_attacks_table[0][s] = b;
-    }
-}
-
-#endif      /* TB_PAWN_ATTACKS */
 
 static void prt_str(const struct pos *pos, char *str, bool mirror)
 {
@@ -947,7 +543,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     uint64_t b, att;
     {
         unsigned from = lsb(pos->kings & us);
-        for (att = king_attacks(from) & them; att; att = poplsb(att))
+        for (att = Movegen::attackFromKing((tSquare)from) & them; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -956,7 +552,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     for (b = us & pos->queens; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = queen_attacks(from, occ) & them; att; att = poplsb(att))
+        for (att = Movegen::attackFromQueen((tSquare)from, (bitMap)occ) & them; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -965,7 +561,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     for (b = us & pos->rooks; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = rook_attacks(from, occ) & them; att; att = poplsb(att))
+        for (att = Movegen::attackFromRook((tSquare)from, (bitMap)occ) & them; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -974,7 +570,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     for (b = us & pos->bishops; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = bishop_attacks(from, occ) & them; att; att = poplsb(att))
+        for (att = Movegen::attackFromBishop((tSquare)from, bitMap(occ)) & them; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -983,7 +579,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     for (b = us & pos->knights; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = knight_attacks(from) & them; att; att = poplsb(att))
+        for (att = Movegen::attackFromKnight((tSquare)from) & them; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -992,7 +588,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        att = pawn_attacks(from, pos->turn);
+        att = Movegen::attackFromPawn(tSquare(from), !pos->turn);
         if (pos->ep != 0 && ((att & board(pos->ep)) != 0))
         {
             unsigned to = pos->ep;
@@ -1067,7 +663,7 @@ static uint16_t *gen_pawn_ep_captures(const struct pos *pos, uint16_t *moves)
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        if ((pawn_attacks(from, pos->turn) & ep) != 0)
+        if ((Movegen::attackFromPawn(tSquare(from), !pos->turn) & ep) != 0)
             moves = add_move(moves, false, from, to);
     }
     return moves;
@@ -1085,7 +681,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     
     {
         unsigned from = lsb(pos->kings & us);
-        for (att = king_attacks(from) & ~us; att; att = poplsb(att))
+        for (att = Movegen::attackFromKing((tSquare)from) & ~us; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -1094,7 +690,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     for (b = us & pos->queens; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = queen_attacks(from, occ) & ~us; att; att = poplsb(att))
+        for (att = Movegen::attackFromQueen((tSquare)from, (bitMap)occ) & ~us; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -1103,7 +699,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     for (b = us & pos->rooks; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = rook_attacks(from, occ) & ~us; att; att = poplsb(att))
+        for (att = Movegen::attackFromRook((tSquare)from, (bitMap)occ) & ~us; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -1112,7 +708,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     for (b = us & pos->bishops; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = bishop_attacks(from, occ) & ~us; att; att = poplsb(att))
+        for (att = Movegen::attackFromBishop((tSquare)from, bitMap(occ)) & ~us; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -1121,7 +717,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     for (b = us & pos->knights; b; b = poplsb(b))
     {
         unsigned from = lsb(b);
-        for (att = knight_attacks(from) & ~us; att; att = poplsb(att))
+        for (att = Movegen::attackFromKnight((tSquare)from) & ~us; att; att = poplsb(att))
         {
             unsigned to = lsb(att);
             moves = add_move(moves, false, from, to);
@@ -1131,7 +727,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     {
         unsigned from = lsb(b);
         unsigned next = from + (pos->turn? 8: -8);
-        att = pawn_attacks(from, pos->turn);
+        att = Movegen::attackFromPawn(tSquare(from), !pos->turn);
         if (pos->ep != 0 && ((att & board(pos->ep)) != 0))
         {
             unsigned to = pos->ep;
@@ -1184,19 +780,19 @@ static bool is_legal(const struct pos *pos)
              them = (pos->turn? pos->white: pos->black);
     uint64_t king = pos->kings & us;
     unsigned sq = lsb(king);
-    if (king_attacks(sq) & (pos->kings & them))
+    if (Movegen::attackFromKing((tSquare)sq) & (pos->kings & them))
         return false;
-    uint64_t ratt = rook_attacks(sq, occ);
-    uint64_t batt = bishop_attacks(sq, occ);
+    uint64_t ratt = Movegen::attackFromRook((tSquare)sq, (bitMap)occ);
+    uint64_t batt = Movegen::attackFromBishop((tSquare)sq, (bitMap)occ);
     if (ratt & (pos->rooks & them))
         return false;
     if (batt & (pos->bishops & them))
         return false;
     if ((ratt | batt) & (pos->queens & them))
         return false;
-    if (knight_attacks(sq) & (pos->knights & them))
+    if (Movegen::attackFromKnight((tSquare)sq) & (pos->knights & them))
         return false;
-    if (pawn_attacks(sq, !pos->turn) & (pos->pawns & them))
+    if (Movegen::attackFromPawn(tSquare(sq), pos->turn) & (pos->pawns & them))
         return false;
     return true;
 }
@@ -1211,17 +807,17 @@ static bool is_check(const struct pos *pos)
              them = (pos->turn? pos->black: pos->white);
     uint64_t king = pos->kings & us;
     unsigned sq = lsb(king);
-    uint64_t ratt = rook_attacks(sq, occ);
-    uint64_t batt = bishop_attacks(sq, occ);
+    uint64_t ratt = Movegen::attackFromRook((tSquare)sq, (bitMap)occ);
+    uint64_t batt = Movegen::attackFromBishop((tSquare)sq, (bitMap)occ);
     if (ratt & (pos->rooks & them))
         return true;
     if (batt & (pos->bishops & them))
         return true;
     if ((ratt | batt) & (pos->queens & them))
         return true;
-    if (knight_attacks(sq) & (pos->knights & them))
+    if (Movegen::attackFromKnight((tSquare)sq) & (pos->knights & them))
         return true;
-    if (pawn_attacks(sq, pos->turn) & (pos->pawns & them))
+    if (Movegen::attackFromPawn(tSquare(sq), !pos->turn) & (pos->pawns & them))
         return true;
     return false;
 }
@@ -1336,10 +932,10 @@ static bool do_move(struct pos *pos, const struct pos *pos0, uint16_t move)
     {
         pos->rule50 = 0;                // Pawn move
         if (rank(from) == 1 && rank(to) == 3 &&
-            (pawn_attacks(from+8, true) & pos0->pawns & pos0->black) != 0)
+            (Movegen::attackFromPawn(tSquare(from+8), 0) & pos0->pawns & pos0->black) != 0)
             pos->ep = from+8;
         else if (rank(from) == 6 && rank(to) == 4 &&
-            (pawn_attacks(from-8, false) & pos0->pawns & pos0->white) != 0)
+            (Movegen::attackFromPawn(tSquare(from-8), 1) & pos0->pawns & pos0->white) != 0)
             pos->ep = from-8;
         else if (to == pos0->ep)
         {
@@ -1798,11 +1394,6 @@ bool tb_init_impl(const char *path)
             sizeof(uint16_t) != 2 &&
             sizeof(uint8_t) != 1)
         return false;
-    king_attacks_init();
-    knight_attacks_init();
-    bishop_attacks_init();
-    rook_attacks_init();
-    pawn_attacks_init();
     if (path == NULL)
         path = "";
     init_tablebases(path);
@@ -1907,35 +1498,6 @@ uint64_t tb_pop_lsb(uint64_t bb)
     return poplsb(bb);
 }
 
-uint64_t tb_king_attacks(unsigned sq)
-{
-    return king_attacks(sq);
-}
-
-uint64_t tb_queen_attacks(unsigned sq, uint64_t occ)
-{
-    return queen_attacks(sq, occ);
-}
-
-uint64_t tb_rook_attacks(unsigned sq, uint64_t occ)
-{
-    return rook_attacks(sq, occ);
-}
-
-uint64_t tb_bishop_attacks(unsigned sq, uint64_t occ)
-{
-    return bishop_attacks(sq, occ);
-}
-
-uint64_t tb_knight_attacks(unsigned sq)
-{
-    return knight_attacks(sq);
-}
-
-uint64_t tb_pawn_attacks(unsigned sq, bool color)
-{
-    return pawn_attacks(sq, color);
-}
 
 #endif      /* TB_NO_HELPER_API */
 

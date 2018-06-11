@@ -348,7 +348,7 @@ public:
 
 private:
 
-
+public:
 	inline static bitMap attackFromRook(const tSquare& from,const bitMap & occupancy)
 	{
 		assert(from <squareNumber);
@@ -364,10 +364,12 @@ private:
 		//return Bmagic(from,occupancy);
 
 	}
+
 	inline static bitMap attackFromQueen(const tSquare from,const bitMap & occupancy)
 	{
 		return attackFromRook(from,occupancy) | attackFromBishop(from,occupancy);
 	}
+
 	inline static const bitMap& attackFromKnight(const tSquare& from)
 	{
 		assert(from <squareNumber);
@@ -378,6 +380,7 @@ private:
 		assert(from <squareNumber);
 		return KING_MOVE[from];
 	}
+
 	inline static const bitMap& attackFromPawn(const tSquare& from,const unsigned int& color )
 	{
 		assert(color <=1);
@@ -385,7 +388,7 @@ private:
 		return PAWN_ATTACK[color][from];
 	}
 
-
+private:
 	// Move generator magic multiplication numbers for files:
 	static bitMap KNIGHT_MOVE[squareNumber];
 	static bitMap KING_MOVE[squareNumber];

@@ -95,37 +95,6 @@
  * to avoid redundancy.
  */
 
-/*
- * Define TB_KING_ATTACKS(square) to return the king attacks bitboard for a
- * king at `square'.
- */
-/* #define TB_KING_ATTACKS(square)          <DEFINITION> */
-
-/*
- * Define TB_KNIGHT_ATTACKS(square) to return the knight attacks bitboard for
- * a knight at `square'.
- */
-/* #define TB_KNIGHT_ATTACKS(square)        <DEFINITION> */
-
-/*
- * Define TB_ROOK_ATTACKS(square, occ) to return the rook attacks bitboard
- * for a rook at `square' assuming the given `occ' occupancy bitboard.
- */
-/* #define TB_ROOK_ATTACKS(square, occ)     <DEFINITION> */
-
-/*
- * Define TB_BISHOP_ATTACKS(square, occ) to return the bishop attacks bitboard
- * for a bishop at `square' assuming the given `occ' occupancy bitboard.
- */
-/* #define TB_BISHOP_ATTACKS(square, occ)   <DEFINITION> */
-
-/*
- * Define TB_QUEEN_ATTACKS(square, occ) to return the queen attacks bitboard
- * for a queen at `square' assuming the given `occ' occupancy bitboard.
- * NOTE: If no definition is provided then tbprobe will use:
- *       TB_ROOK_ATTACKS(square, occ) | TB_BISHOP_ATTACKS(square, occ)
- */
-/* #define TB_QUEEN_ATTACKS(square, occ)    <DEFINITION> */
 
 /*
  * Define TB_PAWN_ATTACKS(square, color) to return the pawn attacks bitboard

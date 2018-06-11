@@ -304,12 +304,6 @@ static inline unsigned tb_probe_root(
 extern unsigned tb_pop_count(uint64_t _bb);
 extern unsigned tb_lsb(uint64_t _bb);
 extern uint64_t tb_pop_lsb(uint64_t _bb);
-extern uint64_t tb_king_attacks(unsigned _square);
-extern uint64_t tb_queen_attacks(unsigned _square, uint64_t _occ);
-extern uint64_t tb_rook_attacks(unsigned _square, uint64_t _occ);
-extern uint64_t tb_bishop_attacks(unsigned _square, uint64_t _occ);
-extern uint64_t tb_knight_attacks(unsigned _square);
-extern uint64_t tb_pawn_attacks(unsigned _square, bool _color);
 
 #endif
 
