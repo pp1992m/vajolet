@@ -8,9 +8,7 @@
 */
 
 #include <stdio.h>
-#ifndef TB_NO_STDINT
 #include <stdint.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -22,18 +20,11 @@
 #endif
 #include "tbcore.h"
 
-#if !defined(DECOMP64) && defined(_LP64)
-// use 64-bit decompression if OS is 64-bit
-// (appears not to work so commented out for now)
-//#define DECOMP64
-#endif
 
 #define TBMAX_PIECE 254
 #define TBMAX_PAWN 256
 #define HSHMAX 5
 
-// for variants where kings can connect and/or captured
-// #define CONNECTED_KINGS
 
 #define Swap(a,b) {int tmp=a;a=b;b=tmp;}
 
@@ -47,21 +38,12 @@
 #define TB_WPAWN TB_PAWN
 #define TB_BPAWN (TB_PAWN | 8)
 
-#ifndef TB_NO_THREADS
 static LOCK_T TB_MUTEX;
-#endif
 
-#ifdef TB_CUSTOM_BSWAP32
-#define internal_bswap32(x) TB_CUSTOM_BSWAP32(x)
-#else
 #define internal_bswap32(x) __builtin_bswap32(x)
-#endif
 
-#ifdef TB_CUSTOM_BSWAP64
-#define internal_bswap64(x) TB_CUSTOM_BSWAP64(x)
-#else
 #define internal_bswap64(x) __builtin_bswap64(x)
-#endif
+
 
 static int initialized = 0;
 static int num_paths = 0;
@@ -792,20 +774,6 @@ static uint64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int
     i = 3;
     break;
 
-  case 1: /* K3 */
-    j = (pos[2] > pos[0]) + (pos[2] > pos[1]);
-
-    idx = KK_idx[triangle[pos[0]]][pos[1]];
-    if (idx < 441)
-      idx = idx + 441 * (pos[2] - j);
-    else {
-      idx = 441*62 + (idx - 441) + 21 * lower[pos[2]];
-      if (!offdiag[pos[2]])
-	idx -= j * 21;
-    }
-    i = 3;
-    break;
-
   default: /* K2 */
     idx = KK_idx[triangle[pos[0]]][pos[1]];
     i = 2;
@@ -1108,11 +1076,8 @@ static void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces
   case 0:
     norm[0] = 3;
     break;
-  case 2:
-    norm[0] = 2;
-    break;
   default:
-    norm[0] = ptr->enc_type - 1;
+    norm[0] = 2;
     break;
   }
 

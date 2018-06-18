@@ -24,35 +24,13 @@
 #ifndef TBPROBE_H
 #define TBPROBE_H
 
-#include "tbconfig.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#ifndef TB_NO_STDINT
 #include <stdint.h>
-#else
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned uint32_t;
-typedef long long unsigned uint64_t;
-typedef char int8_t;
-typedef short int16_t;
-typedef int int32_t;
-typedef long long int64_t;
-#endif
-
-#ifndef TB_NO_STDBOOL
-#include <stdbool.h>
-#else
-#ifndef __cplusplus
-typedef uint8_t bool;
-#define true    1
-#define false   0
-#endif
-#endif
 
 /*
  * Internal definitions.  Do not call these functions directly.
@@ -288,24 +266,6 @@ static inline unsigned tb_probe_root(
     return tb_probe_root_impl(_white, _black, _kings, _queens, _rooks,
         _bishops, _knights, _pawns, _rule50, _ep, _turn, _results);
 }
-
-/****************************************************************************/
-/* HELPER API                                                               */
-/****************************************************************************/
-
-/*
- * The HELPER API provides some useful additional functions.  It is optional
- * and can be disabled by defining TB_NO_HELPER_API.  Engines should disable
- * the HELPER API.
- */
-
-#ifndef TB_NO_HELPER_API
-
-extern unsigned tb_pop_count(uint64_t _bb);
-extern unsigned tb_lsb(uint64_t _bb);
-extern uint64_t tb_pop_lsb(uint64_t _bb);
-
-#endif
 
 #ifdef __cplusplus
 }

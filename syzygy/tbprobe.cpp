@@ -65,23 +65,6 @@
 #define BEST_NONE               0xFFFF
 #define SCORE_ILLEGAL           0x7FFF
 
-#ifndef TB_NO_HW_POP_COUNT
-#ifdef TB_CUSTOM_POP_COUNT
-#define popcount(x) TB_CUSTOM_POP_COUNT(x)
-#else
-#include <popcntintrin.h>
-#define popcount(x)            __builtin_popcountll((x))
-#endif
-#else
-static inline unsigned popcount(uint64_t x)
-{
-    x = x - ((x >> 1) & 0x5555555555555555ull);
-    x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
-    x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full;
-    return (x * 0x0101010101010101ull) >> 56;
-}
-#endif
-
 #define poplsb(x)               ((x) & ((x) - 1))
 
 #define make_move(promote, from, to)                                    \
@@ -121,16 +104,8 @@ unsigned TB_LARGEST = 0;
 #define rank(s)                 ((s) >> 3)
 #define file(s)                 ((s) & 0x07)
 #define board(s)                ((uint64_t)1 << (s))
-#ifdef TB_CUSTOM_LSB
-#define lsb(b) TB_CUSTOM_LSB(b)
-#else
-static inline unsigned lsb(uint64_t b)
-{
-    size_t idx;
-    __asm__("bsfq %1, %0": "=r"(idx): "rm"(b));
-    return idx;
-}
-#endif
+
+
 #define square(r, f)            (8 * (r) + (f))
 
 static void prt_str(const struct pos *pos, char *str, bool mirror)
@@ -144,27 +119,27 @@ static void prt_str(const struct pos *pos, char *str, bool mirror)
         black = tmp;
     }
     *str++ = 'K';
-    for (i = popcount(white & pos->queens); i > 0; i--)
+    for (i = bitCnt(white & pos->queens); i > 0; i--)
         *str++ = 'Q';
-    for (i = popcount(white & pos->rooks); i > 0; i--)
+    for (i = bitCnt(white & pos->rooks); i > 0; i--)
         *str++ = 'R';
-    for (i = popcount(white & pos->bishops); i > 0; i--)
+    for (i = bitCnt(white & pos->bishops); i > 0; i--)
         *str++ = 'B';
-    for (i = popcount(white & pos->knights); i > 0; i--)
+    for (i = bitCnt(white & pos->knights); i > 0; i--)
         *str++ = 'N';
-    for (i = popcount(white & pos->pawns); i > 0; i--)
+    for (i = bitCnt(white & pos->pawns); i > 0; i--)
         *str++ = 'P';
     *str++ = 'v';
     *str++ = 'K';
-    for (i = popcount(black & pos->queens); i > 0; i--)
+    for (i = bitCnt(black & pos->queens); i > 0; i--)
         *str++ = 'Q';
-    for (i = popcount(black & pos->rooks); i > 0; i--)
+    for (i = bitCnt(black & pos->rooks); i > 0; i--)
         *str++ = 'R';
-    for (i = popcount(black & pos->bishops); i > 0; i--)
+    for (i = bitCnt(black & pos->bishops); i > 0; i--)
         *str++ = 'B';
-    for (i = popcount(black & pos->knights); i > 0; i--)
+    for (i = bitCnt(black & pos->knights); i > 0; i--)
         *str++ = 'N';
-    for (i = popcount(black & pos->pawns); i > 0; i--)
+    for (i = bitCnt(black & pos->pawns); i > 0; i--)
         *str++ = 'P';
     *str++ = '\0';
 }
@@ -181,16 +156,16 @@ static uint64_t calc_key(const struct pos *pos, bool mirror)
         white = black;
         black = tmp;
     }
-    return popcount(white & pos->queens)  * PRIME_WHITE_QUEEN +
-           popcount(white & pos->rooks)   * PRIME_WHITE_ROOK +
-           popcount(white & pos->bishops) * PRIME_WHITE_BISHOP +
-           popcount(white & pos->knights) * PRIME_WHITE_KNIGHT +
-           popcount(white & pos->pawns)   * PRIME_WHITE_PAWN +
-           popcount(black & pos->queens)  * PRIME_BLACK_QUEEN +
-           popcount(black & pos->rooks)   * PRIME_BLACK_ROOK +
-           popcount(black & pos->bishops) * PRIME_BLACK_BISHOP +
-           popcount(black & pos->knights) * PRIME_BLACK_KNIGHT +
-           popcount(black & pos->pawns)   * PRIME_BLACK_PAWN;
+    return bitCnt(white & pos->queens)  * PRIME_WHITE_QUEEN +
+           bitCnt(white & pos->rooks)   * PRIME_WHITE_ROOK +
+           bitCnt(white & pos->bishops) * PRIME_WHITE_BISHOP +
+           bitCnt(white & pos->knights) * PRIME_WHITE_KNIGHT +
+           bitCnt(white & pos->pawns)   * PRIME_WHITE_PAWN +
+           bitCnt(black & pos->queens)  * PRIME_BLACK_QUEEN +
+           bitCnt(black & pos->rooks)   * PRIME_BLACK_ROOK +
+           bitCnt(black & pos->bishops) * PRIME_BLACK_BISHOP +
+           bitCnt(black & pos->knights) * PRIME_BLACK_KNIGHT +
+           bitCnt(black & pos->pawns)   * PRIME_BLACK_PAWN;
 }
 
 static uint64_t calc_key_from_pcs(int *pcs, int mirror)
@@ -330,7 +305,7 @@ static int probe_wdl_table(const struct pos *pos, int *success)
             uint64_t bb = get_pieces(pos, pc[i] ^ cmirror);
             do
             {
-                p[i++] = lsb(bb);
+                p[i++] = firstOne(bb);
                 bb = poplsb(bb);
             } while (bb);
         }
@@ -344,7 +319,7 @@ static int probe_wdl_table(const struct pos *pos, int *success)
         uint64_t bb = get_pieces(pos, k);
         i = 0;
         do {
-            p[i++] = lsb(bb) ^ mirror;
+            p[i++] = firstOne(bb) ^ mirror;
             bb = poplsb(bb);
         } while (bb);
         int f = pawn_file(entry, p);
@@ -354,7 +329,7 @@ static int probe_wdl_table(const struct pos *pos, int *success)
             bb = get_pieces(pos, pc[i] ^ cmirror);
             do
             {
-                p[i++] = lsb(bb) ^ mirror;
+                p[i++] = firstOne(bb) ^ mirror;
                 bb = poplsb(bb);
             } while (bb);
         }
@@ -460,7 +435,7 @@ static int probe_dtz_table(const struct pos *pos, int wdl, int *success)
             uint64_t bb = get_pieces(pos, pc[i] ^ cmirror);
             do
             {
-                p[i++] = lsb(bb);
+                p[i++] = firstOne(bb);
                 bb = poplsb(bb);
             }
             while (bb);
@@ -482,7 +457,7 @@ static int probe_dtz_table(const struct pos *pos, int wdl, int *success)
         i = 0;
         do
         {
-            p[i++] = lsb(bb) ^ mirror;
+            p[i++] = firstOne(bb) ^ mirror;
             bb = poplsb(bb);
         }
         while (bb);
@@ -498,7 +473,7 @@ static int probe_dtz_table(const struct pos *pos, int wdl, int *success)
             bb = get_pieces(pos, pc[i] ^ cmirror);
             do
             {
-                p[i++] = lsb(bb) ^ mirror;
+                p[i++] = firstOne(bb) ^ mirror;
                 bb = poplsb(bb);
             }
             while (bb);
@@ -542,52 +517,52 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
              them = (pos->turn? pos->black: pos->white);
     uint64_t b, att;
     {
-        unsigned from = lsb(pos->kings & us);
+        unsigned from = firstOne(pos->kings & us);
         for (att = Movegen::attackFromKing((tSquare)from) & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->queens; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromQueen((tSquare)from, (bitMap)occ) & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->rooks; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromRook((tSquare)from, (bitMap)occ) & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->bishops; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromBishop((tSquare)from, bitMap(occ)) & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->knights; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromKnight((tSquare)from) & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         att = Movegen::attackFromPawn(tSquare(from), !pos->turn);
         if (pos->ep != 0 && ((att & board(pos->ep)) != 0))
         {
@@ -596,7 +571,7 @@ static uint16_t *gen_captures_or_promotions(const struct pos *pos,
         }
         for (att = att & them; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, (rank(to) == 7 || rank(to) == 0), from,
                 to);
         }
@@ -628,7 +603,7 @@ static uint16_t *gen_pawn_quiets_or_promotions(const struct pos *pos,
 
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         unsigned next = from + (pos->turn? 8: -8);
         att = 0;
         if ((board(next) & occ) == 0)
@@ -641,7 +616,7 @@ static uint16_t *gen_pawn_quiets_or_promotions(const struct pos *pos,
         }
         for (; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, (rank(to) == 7 || rank(to) == 0), from,
                 to);
         }
@@ -662,7 +637,7 @@ static uint16_t *gen_pawn_ep_captures(const struct pos *pos, uint16_t *moves)
     uint64_t b;
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         if ((Movegen::attackFromPawn(tSquare(from), !pos->turn) & ep) != 0)
             moves = add_move(moves, false, from, to);
     }
@@ -680,52 +655,52 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
     uint64_t b, att;
     
     {
-        unsigned from = lsb(pos->kings & us);
+        unsigned from = firstOne(pos->kings & us);
         for (att = Movegen::attackFromKing((tSquare)from) & ~us; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->queens; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromQueen((tSquare)from, (bitMap)occ) & ~us; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->rooks; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromRook((tSquare)from, (bitMap)occ) & ~us; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->bishops; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromBishop((tSquare)from, bitMap(occ)) & ~us; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->knights; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         for (att = Movegen::attackFromKnight((tSquare)from) & ~us; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, false, from, to);
         }
     }
     for (b = us & pos->pawns; b; b = poplsb(b))
     {
-        unsigned from = lsb(b);
+        unsigned from = firstOne(b);
         unsigned next = from + (pos->turn? 8: -8);
         att = Movegen::attackFromPawn(tSquare(from), !pos->turn);
         if (pos->ep != 0 && ((att & board(pos->ep)) != 0))
@@ -744,7 +719,7 @@ static uint16_t *gen_moves(const struct pos *pos, uint16_t *moves)
         }
         for (; att; att = poplsb(att))
         {
-            unsigned to = lsb(att);
+            unsigned to = firstOne(att);
             moves = add_move(moves, (rank(to) == 7 || rank(to) == 0), from,
                 to);
         }
@@ -779,7 +754,7 @@ static bool is_legal(const struct pos *pos)
     uint64_t us = (pos->turn? pos->black: pos->white),
              them = (pos->turn? pos->white: pos->black);
     uint64_t king = pos->kings & us;
-    unsigned sq = lsb(king);
+    unsigned sq = firstOne(king);
     if (Movegen::attackFromKing((tSquare)sq) & (pos->kings & them))
         return false;
     uint64_t ratt = Movegen::attackFromRook((tSquare)sq, (bitMap)occ);
@@ -806,7 +781,7 @@ static bool is_check(const struct pos *pos)
     uint64_t us = (pos->turn? pos->white: pos->black),
              them = (pos->turn? pos->black: pos->white);
     uint64_t king = pos->kings & us;
-    unsigned sq = lsb(king);
+    unsigned sq = firstOne(king);
     uint64_t ratt = Movegen::attackFromRook((tSquare)sq, (bitMap)occ);
     uint64_t batt = Movegen::attackFromBishop((tSquare)sq, (bitMap)occ);
     if (ratt & (pos->rooks & them))
@@ -846,11 +821,11 @@ static bool is_mate(const struct pos *pos)
  */
 static bool is_valid(const struct pos *pos)
 {
-    if (popcount(pos->kings) != 2)
+    if (bitCnt(pos->kings) != 2)
         return false;
-    if (popcount(pos->kings & pos->white) != 1)
+    if (bitCnt(pos->kings & pos->white) != 1)
         return false;
-    if (popcount(pos->kings & pos->black) != 1)
+    if (bitCnt(pos->kings & pos->black) != 1)
         return false;
     if ((pos->white & pos->black) != 0)
         return false;
@@ -1481,23 +1456,4 @@ unsigned tb_probe_root_impl(
     return res;
 }
 
-#ifndef TB_NO_HELPER_API
-
-unsigned tb_pop_count(uint64_t bb)
-{
-    return popcount(bb);
-}
-
-unsigned tb_lsb(uint64_t bb)
-{
-    return lsb(bb);
-}
-
-uint64_t tb_pop_lsb(uint64_t bb)
-{
-    return poplsb(bb);
-}
-
-
-#endif      /* TB_NO_HELPER_API */
 
